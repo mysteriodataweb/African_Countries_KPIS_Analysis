@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+data/processed/*.duckdb
+data/processed/*.db
+notebooks/.ipynb_checkpoints/
+.env
+.vscode/
+.idea/
+*.egg-info/
+dist/
+build/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
