@@ -20,7 +20,7 @@ conserver que les véritables pays.
 
 ### Période couverte
 
-2000–2024 (paramétrable via les arguments `--start` et `--end` du pipeline).
+2000–2024 (paramétrable via les variables `DATE_START` et `DATE_END` du notebook).
 
 ## Indicateurs sélectionnés
 
@@ -33,9 +33,27 @@ conserver que les véritables pays.
 | EG.ELC.ACCS.ZS | Accès à l'électricité (%) | Infrastructure | ODD 7 — Énergie propre |
 | SE.PRM.ENRR | Taux brut de scolarisation primaire (%) | Éducation | ODD 4 — Éducation de qualité |
 | SE.ADT.LITR.ZS | Taux d'alphabétisation adultes (%) | Éducation | Capital humain |
-| SH.DYN.MORT | Mortalité infantile (‰) | Santé | ODD 3 — Santé |
+| SH.DYN.MORT | Mortalité des moins de 5 ans (‰ naissances vivantes) | Santé | ODD 3 — Santé (cible 3.2) |
 | SH.XPD.CHEX.GD.ZS | Dépenses de santé (% PIB) | Santé | Effort sanitaire national |
 | SI.POV.DDAY | Taux de pauvreté extrême (%) | Pauvreté | ODD 1 — Pas de pauvreté |
+
+## Traitements appliqués
+
+- **Valeurs manquantes** : conservées avec `valeur = null` et `is_missing = true`
+  (jamais imputées).
+- **Doublons** pays × indicateur × année : détectés, signalés puis dédupliqués.
+- **Référentiel pays** : espaces superflus supprimés, coordonnées converties en nombres.
+- **Libellés** : noms de pays traduits en français et regroupés par sous-région
+  (classification M49 des Nations unies) dans le dashboard.
+
+## Synthèses affichées sur le dashboard
+
+- Pour la population et le PIB total, la carte d'accueil affiche le **total** des pays.
+- Pour les autres indicateurs, il s'agit d'une **moyenne simple** entre pays
+  (non pondérée par la population).
+- L'année retenue est la dernière où au moins la moitié des pays habituellement
+  couverts sont renseignés, afin d'éviter des moyennes calculées sur 1 ou 2 pays.
+- La carte choroplèthe répartit les pays en 5 classes par **quantiles**.
 
 ## Limites connues
 
@@ -51,10 +69,9 @@ conserver que les véritables pays.
 ## Reproductibilité
 
 1. Créer l'environnement : `pip install -r requirements.txt`
-2. Lancer le pipeline : `python -m src.pipeline`
-   - Options : `--start 2000 --end 2024 --force-refresh`
-3. Exporter les données pour le frontend : `python -m src.export_json`
-4. Lancer les tests : `pytest tests/`
+2. Ouvrir `pipeline_complet.ipynb` et exécuter toutes les cellules
+   (`FORCE_REFRESH = True` pour ignorer le cache).
+3. La dernière partie du notebook régénère les fichiers JSON de `frontend/public/data/`.
+4. Lancer le dashboard : `cd frontend && npm install && npm run dev`.
 
-Le cache local évite de re-solliciter l'API à chaque exécution.
-Pour forcer un rafraîchissement complet : `python -m src.pipeline --force-refresh`.
+Le cache local (`data/raw/`, durée 24 h) évite de re-solliciter l'API à chaque exécution.

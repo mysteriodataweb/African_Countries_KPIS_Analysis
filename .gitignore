@@ -1,16 +1,26 @@
+# Environnements virtuels Python
 .venv/
+venv/
+.mart/
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
+
+# Données locales du pipeline
 data/raw/
-data/processed/*.duckdb
-data/processed/*.db
-notebooks/.ipynb_checkpoints/
+data/processed/
+
+# Divers
 .env
 .vscode/
 .idea/
+.DS_Store
 *.egg-info/
 dist/
 build/
+
+# Frontend
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/*.tsbuildinfo

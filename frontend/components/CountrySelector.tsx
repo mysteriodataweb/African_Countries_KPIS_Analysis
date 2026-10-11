@@ -2,80 +2,103 @@
 
 import { useState } from "react";
 import type { Pays } from "@/lib/types";
+import { SOUS_REGIONS, nomPays, sousRegionPays } from "@/lib/pays";
+
+export const MAX_PAYS_SELECTIONNES = 8;
 
 interface CountrySelectorProps {
   pays: Pays[];
-  selectionnes: string[];
-  indicateurCode: string;
-  onSelectionChange?: (codes: string[]) => void;
+  selection: string[];
+  onSelectionChange: (codes: string[]) => void;
+}
+
+function normaliser(texte: string): string {
+  return texte.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 export function CountrySelector({
   pays,
-  selectionnes: initialSelection,
+  selection,
   onSelectionChange,
 }: CountrySelectorProps) {
   const [recherche, setRecherche] = useState("");
-  const [selection, setSelection] = useState<string[]>(initialSelection.slice(0, 8));
+  const pleine = selection.length >= MAX_PAYS_SELECTIONNES;
 
-  const sousRegions = [...new Set(pays.map((p) => p.sous_region ?? "Autre"))].sort();
+  const terme = normaliser(recherche);
+  const filtres = pays
+    .filter(
+      (p) =>
+        normaliser(nomPays(p.code_iso3, p.nom)).includes(terme) ||
+        normaliser(p.nom).includes(terme) ||
+        p.code_iso3.toLowerCase().includes(terme)
+    )
+    .sort((a, b) =>
+      nomPays(a.code_iso3, a.nom).localeCompare(nomPays(b.code_iso3, b.nom), "fr")
+    );
 
-  const filtered = pays.filter((p) =>
-    p.nom.toLowerCase().includes(recherche.toLowerCase())
-  );
-
-  const toggleCountry = (code: string) => {
-    let newSelection: string[];
+  const toggle = (code: string) => {
     if (selection.includes(code)) {
-      newSelection = selection.filter((c) => c !== code);
-    } else {
-      if (selection.length >= 8) return;
-      newSelection = [...selection, code];
+      onSelectionChange(selection.filter((c) => c !== code));
+    } else if (!pleine) {
+      onSelectionChange([...selection, code]);
     }
-    setSelection(newSelection);
-    onSelectionChange?.(newSelection);
   };
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white p-4">
-      <input
-        type="text"
-        placeholder="Rechercher un pays..."
-        value={recherche}
-        onChange={(e) => setRecherche(e.target.value)}
-        className="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3"
-      />
-      <div className="max-h-48 overflow-y-auto text-sm">
-        {sousRegions.map((region) => {
-          const paysRegion = filtered.filter(
-            (p) => (p.sous_region ?? "Autre") === region
-          );
+      <div className="flex gap-2 mb-3">
+        <input
+          type="search"
+          placeholder="Rechercher un pays..."
+          aria-label="Rechercher un pays"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => onSelectionChange([])}
+          disabled={selection.length === 0}
+          className="px-3 py-2 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+        >
+          Tout désélectionner
+        </button>
+      </div>
+      <div className="max-h-56 overflow-y-auto text-sm grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4">
+        {[...SOUS_REGIONS, "Autre" as const].map((region) => {
+          const paysRegion = filtres.filter((p) => sousRegionPays(p.code_iso3) === region);
           if (paysRegion.length === 0) return null;
           return (
             <div key={region} className="mb-2">
-              <p className="text-xs text-gray-500 font-medium mb-1 uppercase">
-                {region}
-              </p>
-              {paysRegion.map((p) => (
-                <label
-                  key={p.code_iso3}
-                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selection.includes(p.code_iso3)}
-                    onChange={() => toggleCountry(p.code_iso3)}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-gray-700">{p.nom}</span>
-                </label>
-              ))}
+              <p className="text-xs text-gray-500 font-medium mb-1 uppercase">{region}</p>
+              {paysRegion.map((p) => {
+                const coche = selection.includes(p.code_iso3);
+                return (
+                  <label
+                    key={p.code_iso3}
+                    className={`flex items-center gap-2 px-2 py-1 rounded ${
+                      !coche && pleine
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:bg-gray-50 cursor-pointer"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={coche}
+                      disabled={!coche && pleine}
+                      onChange={() => toggle(p.code_iso3)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-gray-700">{nomPays(p.code_iso3, p.nom)}</span>
+                  </label>
+                );
+              })}
             </div>
           );
         })}
       </div>
-      <p className="text-xs text-gray-400 mt-2">
-        {selection.length}/8 pays sélectionnés
+      <p className="text-xs text-gray-500 mt-2">
+        {selection.length}/{MAX_PAYS_SELECTIONNES} pays sélectionnés
       </p>
     </div>
   );
