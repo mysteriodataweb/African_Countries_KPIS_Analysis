@@ -1,3 +1,5 @@
+// Lecture des données au moment du build (Server Components uniquement).
+// Les composants client doivent utiliser lib/client.ts.
 import fs from "fs";
 import path from "path";
 import type { Pays, Indicateur, Valeur } from "./types";
@@ -26,40 +28,10 @@ export function getValeursParIndicateur(code: string): Valeur[] {
   return readJSON<Valeur[]>(`valeurs_par_indicateur/${code}.json`);
 }
 
-export const client = {
-  async getPays(): Promise<Pays[]> {
-    const res = await fetch("/data/pays.json");
-    if (!res.ok) throw new Error(`Erreur chargement pays: ${res.status}`);
-    return res.json();
-  },
-  async getIndicateurs(): Promise<Indicateur[]> {
-    const res = await fetch("/data/indicateurs.json");
-    if (!res.ok) throw new Error(`Erreur chargement indicateurs: ${res.status}`);
-    return res.json();
-  },
-  async getValeurs(): Promise<Valeur[]> {
-    const res = await fetch("/data/valeurs.json");
-    if (!res.ok) throw new Error(`Erreur chargement valeurs: ${res.status}`);
-    return res.json();
-  },
-};
-
-export function getPaletteCouleurs(): Record<string, string> {
-  return {
-    CIV: "#1f77b4",
-    SEN: "#ff7f0e",
-    GHA: "#2ca02c",
-    NGA: "#d62728",
-    MLI: "#9467bd",
-    BFA: "#8c564b",
-    BEN: "#e377c2",
-    TGO: "#7f7f7f",
-    KEN: "#bcbd22",
-    ZAF: "#17becf",
-    ETH: "#aec7e8",
-    TZA: "#ffbb78",
-    COD: "#98df8a",
-    CMR: "#ff9896",
-    AGO: "#c5b0d5",
-  };
+/** Documentation méthodologique (source unique : docs/methodologie.md à la racine du dépôt). */
+export function getMethodologie(): string {
+  return fs.readFileSync(
+    path.join(process.cwd(), "..", "docs", "methodologie.md"),
+    "utf-8"
+  );
 }

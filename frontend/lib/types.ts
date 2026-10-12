@@ -17,12 +17,9 @@ export interface Indicateur {
 
 export interface Valeur {
   pays_code: string;
+  pays_nom?: string;
   indicateur_code: string;
   annee: number;
   valeur: number | null;
   is_missing: boolean;
-}
-
-export interface IndicateurAvecValeurs extends Indicateur {
-  valeurs: Valeur[];
 }

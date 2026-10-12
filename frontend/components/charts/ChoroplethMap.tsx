@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  ZoomableGroup,
-} from "react-simple-maps";
-import { scaleThreshold } from "d3-scale";
+import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { scaleQuantile } from "d3-scale";
 import type { Valeur, Pays, Indicateur } from "@/lib/types";
+import { formatNombre, formatValeur, libelleUnite } from "@/lib/format";
+import { nomPays } from "@/lib/pays";
 
 interface ChoroplethMapProps {
   valeurs: Valeur[];
@@ -17,117 +14,103 @@ interface ChoroplethMapProps {
   annee: number;
 }
 
-const GEO_URL =
-  "https://raw.githubusercontent.com/deldersveld/topojson/master/continents/africa.json";
+// Fond de carte embarqué (généré par scripts/build-africa-topojson.mjs).
+const GEO_URL = "/geo/africa.topo.json";
+const COULEURS = ["#eff6ff", "#bfdbfe", "#60a5fa", "#2563eb", "#1e3a8a"];
+const COULEUR_SANS_DONNEE = "#e5e7eb";
 
-export function ChoroplethMap({
-  valeurs,
-  pays,
-  indicateur,
-  annee,
-}: ChoroplethMapProps) {
-  const [tooltipContent, setTooltipContent] = useState("");
+export function ChoroplethMap({ valeurs, pays, indicateur, annee }: ChoroplethMapProps) {
+  const [tooltip, setTooltip] = useState("");
 
-  const annees = [...new Set(valeurs.map((v) => v.annee))].sort(
-    (a, b) => b - a
-  );
-  const anneeEffective = annees.includes(annee)
-    ? annee
-    : annees[0] ?? annee;
-
-  const valeursAnnee = valeurs.filter((v) => v.annee === anneeEffective);
-
-  const valeursMap = new Map<string, number | null>();
-  for (const v of valeursAnnee) {
-    valeursMap.set(v.pays_code, v.is_missing ? null : v.valeur);
+  const paysMap = new Map(pays.map((p) => [p.code_iso3, p]));
+  const valeursMap = new Map<string, number>();
+  for (const v of valeurs) {
+    if (v.annee === annee && !v.is_missing && v.valeur !== null) {
+      valeursMap.set(v.pays_code, v.valeur);
+    }
   }
-
-  const valeursNonNulles = [...valeursMap.values()].filter(
-    (v): v is number => v !== null
-  );
+  const valeursNonNulles = Array.from(valeursMap.values());
 
   if (valeursNonNulles.length === 0) {
     return (
       <p className="text-gray-500 text-sm py-8 text-center">
-        Aucune donnée disponible pour {anneeEffective}.
+        Aucune donnée disponible pour {annee}.
       </p>
     );
   }
 
-  const min = Math.min(...valeursNonNulles);
-  const max = Math.max(...valeursNonNulles);
-  const steps = 5;
-  const step = (max - min) / steps;
-
-  const colorScale = scaleThreshold<number, string>()
-    .domain(
-      Array.from({ length: steps - 1 }, (_, i) => min + step * (i + 1))
-    )
-    .range([
-      "#eff6ff",
-      "#bfdbfe",
-      "#60a5fa",
-      "#2563eb",
-      "#1e3a8a",
-    ]);
+  // Quantiles : chaque classe regroupe ~20 % des pays, lisible même pour des
+  // distributions très asymétriques (PIB, population).
+  const colorScale = scaleQuantile<string>().domain(valeursNonNulles).range(COULEURS);
+  const seuils = [Math.min(...valeursNonNulles), ...colorScale.quantiles(), Math.max(...valeursNonNulles)];
 
   return (
     <div className="relative">
-      <ComposableMap projection="geoMercator" className="w-full h-auto">
-        <ZoomableGroup zoom={1} center={[20, 5]}>
-          <Geographies geography={GEO_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const code = geo.properties?.ISO_A3 ?? "";
-                const valeur = valeursMap.get(code);
-                const paysInfo = pays.find((p) => p.code_iso3 === code);
+      <p className="text-xs text-gray-500 mb-2">
+        {annee} &middot; {valeursMap.size} pays renseignés sur {pays.length}
+      </p>
+      <ComposableMap
+        projection="geoMercator"
+        projectionConfig={{ center: [17, 1], scale: 560 }}
+        width={800}
+        height={820}
+        className="w-full h-auto max-h-[640px]"
+      >
+        <Geographies geography={GEO_URL}>
+          {({ geographies }) =>
+            geographies.map((geo) => {
+              const code: string = geo.properties?.ISO_A3 ?? "";
+              const valeur = valeursMap.get(code);
+              const nom = paysMap.has(code)
+                ? nomPays(code, paysMap.get(code)?.nom)
+                : geo.properties?.name ?? code;
 
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill={
-                      valeur !== null && valeur !== undefined
-                        ? colorScale(valeur)
-                        : "#e5e7eb"
-                    }
-                    stroke="#d1d5db"
-                    strokeWidth={0.5}
-                    onMouseEnter={() => {
-                      const nom = paysInfo?.nom ?? code;
-                      const val =
-                        valeur !== null && valeur !== undefined
-                          ? `${valeur.toLocaleString("fr-FR")} ${indicateur.unit}`
-                          : "Donnée non disponible";
-                      setTooltipContent(`${nom} — ${val}`);
-                    }}
-                    onMouseLeave={() => setTooltipContent("")}
-                    style={{
-                      default: { outline: "none" },
-                      hover: { fill: "#fbbf24", outline: "none" },
-                      pressed: { outline: "none" },
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ZoomableGroup>
+              return (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  fill={valeur !== undefined ? colorScale(valeur) : COULEUR_SANS_DONNEE}
+                  stroke="#9ca3af"
+                  strokeWidth={0.5}
+                  onMouseEnter={() =>
+                    setTooltip(`${nom} — ${formatValeur(valeur, indicateur.unit)}`)
+                  }
+                  onMouseLeave={() => setTooltip("")}
+                  style={{
+                    default: { outline: "none" },
+                    hover: { fill: "#fbbf24", outline: "none" },
+                    pressed: { outline: "none" },
+                  }}
+                />
+              );
+            })
+          }
+        </Geographies>
       </ComposableMap>
-      {tooltipContent && (
-        <div className="absolute bottom-4 left-4 bg-white px-3 py-2 rounded shadow text-sm border">
-          {tooltipContent}
+      {tooltip && (
+        <div className="absolute top-8 right-4 bg-white px-3 py-2 rounded shadow text-sm border pointer-events-none">
+          {tooltip}
         </div>
       )}
-      <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
-        <span>{min.toFixed(1)}</span>
-        <div className="flex-1 h-3 flex rounded overflow-hidden">
-          {colorScale.range().map((color, i) => (
-            <div key={i} className="flex-1" style={{ backgroundColor: color }} />
+      <div className="mt-2 text-xs text-gray-600">
+        <div className="flex h-3 rounded overflow-hidden">
+          {COULEURS.map((c) => (
+            <div key={c} className="flex-1" style={{ backgroundColor: c }} />
           ))}
         </div>
-        <span>{max.toFixed(1)}</span>
-        <span className="ml-2 text-gray-500">{indicateur.unit}</span>
+        <div className="flex justify-between mt-1">
+          {seuils.map((s, i) => (
+            <span key={i}>{formatNombre(s)}</span>
+          ))}
+        </div>
+        <p className="mt-1 text-gray-500">
+          Unité : {libelleUnite(indicateur.unit)} &middot; classes par quantiles &middot;{" "}
+          <span
+            className="inline-block w-3 h-3 align-middle rounded-sm"
+            style={{ backgroundColor: COULEUR_SANS_DONNEE }}
+          />{" "}
+          donnée manquante
+        </p>
       </div>
     </div>
   );
